@@ -1,8 +1,8 @@
 # General description of project
-> Building a POS(point of sale)-like system for a bookstore.
+> Building a inventory tracking system for a bookstore.
 
 # Goals of project
-> Streamline tracking and cataloguing of inventory to aid the selling of items thr 
+> Streamline tracking and cataloguing of inventory to aid the selling of items in a bookstore
 
 # Listing of features
 > name, price, current inventory, edit inventory, decrease inventory(remove certain number of items from the inventory), increase inventory(adds certain number of items to the inventory), id of item
@@ -12,8 +12,9 @@
 > I will be using python and there will be no database software used
 
 # Listing of Key Use Cases
-> Yearly, CCA senior will do stock-take and will need to generate a report on the existing stock.
-> Start of school break, members will loan equipment and will need to return when school break ends.
+> Weekly, merchandisers need to do a stock-take of the inventory in the bookstores.
+> Everytime an item is sold, the inventory of an item needs to be decreased.
+> When there is a delivery, the inventory of an item needs to be increased.
 
 # Skills that my project requires me to pick up
 > List out the skills that you are not familiar with that is necessary due to the project scope.
