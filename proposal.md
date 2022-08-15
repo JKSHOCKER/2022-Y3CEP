@@ -1,14 +1,15 @@
 # General description of project
-> E.g. Building an inventory tracking system for my CCA
+> Building a POS(point of sale)-like system for a bookstore.
 
-#Goals of project
-> E.g. Streamline tracking and cataloguing of inventory to facilitate member loans, repairs & Semester stock-taking needs
+# Goals of project
+> Streamline tracking and cataloguing of inventory to aid the selling of items thr 
 
 # Listing of features
-> List all the features in the fully functional app - you may choose to work on a subset of this listing to produce a MVP (minimum viable product) given constraint of time
+> name, price, current inventory, edit inventory, decrease inventory(remove certain number of items from the inventory), increase inventory(adds certain number of items to the inventory), id of item
 
 # External Scanning
-> Are there similar apps / codebase that you found online that is similar to your project?  Provide link(s) to these projects and outline how will your project be different?
+> https://github.com/opensourcepos/opensourcepos 
+> I will be using python and there will be no database software used
 
 # Listing of Key Use Cases
 > Yearly, CCA senior will do stock-take and will need to generate a report on the existing stock.
