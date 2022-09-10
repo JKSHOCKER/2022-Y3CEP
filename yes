@@ -1,0 +1,464 @@
+# # adventure.py #
+
+import random
+
+
+# This procedure determines if the input obj provides a method named mname.
+# It is not necessary to understand how this code works.
+def has_method(obj, mname):
+    try:
+        if getattr(obj, mname):
+            return True
+    except AttributeError:
+        return False            
+    
+class SimObject:
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return "<simobject: " + self.name + ">"
+    
+    def is_ownable(self):
+        return False # overridden by some subtypes
+
+    def is_installed(self):
+        return False # overridden by some subtypes
+
+    def is_greetable(self):
+        return False # overriden by objects that like to be greeted
+    
+    def note(self, msg):
+        print ("%s: %s" % (self, msg))
+
+class PhysicalObject (SimObject):
+    def __init__(self, name):
+        SimObject.__init__(self, name)
+        self.location = False # not set until installed
+
+    def is_installed(self):
+        return self.location # if it has a location, is installed
+    
+    def install(self, loc):
+        self.note ("Installing at " + str(loc))
+        self.location = loc
+        loc.add_thing(self)
+
+class MobileObject (PhysicalObject):
+    def change_location(self, loc):
+        self.location.remove_thing(self)
+        loc.add_thing(self)
+        self.location = loc
+
+# Physical objects have a location as well as a name
+
+class OwnableObject (MobileObject):
+    def __init__(self, name):
+        MobileObject.__init__(self, name)
+        self.owner = None # not owned
+
+    def is_ownable(self): return True
+    def is_owned(self): return self.owner
+
+def direction_opposite(d):
+    if d == 'north': return 'south'
+    elif d == 'south': return 'north'
+    elif d == 'east': return 'west'
+    elif d == 'west': return 'east'
+    else: raise Exception("Bad direction: " + d)
+
+# Place
+
+class Place (SimObject):
+    def __init__(self, name):
+        SimObject.__init__(self, name) 
+        self.__neighbors = {} # dictionary of direction -> place entries
+        self.__things = [] # list of SimObject
+        
+    def __str__(self):
+        return "<place: " + self.name + ">"
+   
+    def is_place(self):
+        return true
+
+    def reset(self):
+        self.note("Reset")
+        self.__neighbors = {}
+        self.__things = []
+
+    def get_things(self):
+        # Returns a copy of the things.  (Dangerous to expose
+        # the actual things, since caller could modify them!)
+        return list(self.__things)
+
+    def get_thing(self, thingname):
+        for t in self.__things:
+            if thingname == t.name:
+                return t
+        return None
+    def has_thing (self, thing):
+        return thing in self.__things
+
+    def add_thing(self, thing):
+        self.__things.append(thing)
+
+    def remove_thing(self, thing):
+        assert (thing in self.__things)
+        self.__things.remove(thing)
+    
+    def get_neighbors(self):
+        return self.__neighbors.values()
+
+    def get_exits(self):
+        return self.__neighbors.keys()
+
+    def neighbor_towards(self, direction):
+        if direction in self.__neighbors:
+            return self.__neighbors[direction]
+        else:
+            return False # no neighbor in this direction
+        
+    def add_neighbor(self, direction, place):
+        if self.neighbor_towards(direction):
+            raise StandardError("Attempt to add duplicate neighbor to " + str(self) + ": " + str(place))
+        self.__neighbors[direction] = place
+        
+def list_to_string(p):
+    if not p:
+        return "nothing"
+    msg = ""
+    for el in p:
+       msg = msg + str(el) + ", "
+    msg = msg.rstrip(", ")# remove the last comma
+    return msg
+    
+class Person (MobileObject):
+    def __init__(self, name):
+        MobileObject.__init__(self, name)
+        self.__possessions = [] # what person is crrying (initially empty)
+        self.__restlessness = 0.0 # propensity to move randomly
+
+    def get_possessions(self):
+        # return a copy, caller should not be able to modify possessions
+        return list(self.__possessions) 
+    
+    def display_possessions(self):
+        self.say ("I have " + list_to_string(self.__possessions))
+
+    def say(self, utterance):
+        if self.is_installed ():
+            print ("At " + self.location.name + ":")
+        print (self.name + " says -- " + utterance)
+
+    def have_fit(self):
+        self.say("Yaaaah! I am upset!")
+
+    def look(self):
+        if not self.is_installed():
+            self.note("Cannot look until person is installed.")
+            return
+        
+        # Don't see yourself, so remove it from things
+        otherthings = self.location.get_things()
+        otherthings.remove(self)
+        otherthingnames = list(map(lambda t: t.name, otherthings))
+        self.say("I see " + list_to_string(otherthingnames))
+        self.say("I can go " + list_to_string(self.location.get_exits()))
+
+    def take(self, thingname):
+        if not self.is_installed():
+            self.note("Cannot take until person is installed.")
+            return
+        thing = self.location.get_thing(thingname) #get the object based on name
+        if thing != None:
+            if thing in self.__possessions:
+                self.say ("I already have " + thing.name)
+                return False
+            else: 
+                if thing.is_ownable():
+                    if thing.is_owned():
+                        thing.owner.lose(thing)
+                    thing.owner = self
+                    self.__possessions.append(thing)                
+                    self.say ("I take " + thing.name)
+                    return True
+                else:
+                    self.say ("Cannot take " + thing.name)
+                    return False
+        else:
+            self.say ("There is no " + thingname + " here")
+            return False
+
+    def lose(self, thing):
+        assert self.is_installed()
+        if thing.owner == self:
+            assert thing in self.__possessions
+            self.__possessions.remove(thing)
+            self.say ("I lose " + str(thing))
+            self.have_fit()
+            return True
+        else:
+            self.say ("I cannot lose what I do not have, and I have no " + str(thing))
+            return False
+
+    def set_restlessness(self, value):
+        self.__restlessness = value
+
+    def is_greetable(self): 
+        return True
+    
+    def tick(self):
+        if random.random() < self.__restlessness:
+            self.act_randomly()
+
+    def act_randomly(self):
+        exits = self.location.get_exits()
+        if exits:
+            randomexit = random.sample(exits, 1)[0]
+            self.go(randomexit)
+
+    def move(self, loc):
+        if not self.is_installed():
+            self.note("Cannot move until person is installed.")
+            return
+
+        assert isinstance(loc, Place)
+        print (self.name + " moves from " + self.location.name + " to " + loc.name)
+        self.change_location(loc)
+        for thing in self.__possessions:
+            thing.change_location(loc)
+        greetees = list(filter(lambda t: t.is_greetable(), loc.get_things()))
+        greetees.remove(self) # don't greet yourself!
+        if greetees:
+            map(lambda greetee: self.say("Hi " + greetee.name), greetees)
+        else:
+            self.say("Its lonely here...")
+
+    def go(self, direct):
+        if not self.is_installed():
+            self.note("Cannot go until person is installed.")
+            return
+
+        newloc = self.location.neighbor_towards(direct)
+        if newloc:
+            return self.move(newloc)
+        else:
+            print ("You cannot go " + str(direct) + " from " + str(self.location))
+            return False
+
+class World:
+    def __init__(self, n):
+        self.name = n
+        # to make lookups fast, we store the places in a dictionary indexed by name
+        self.__places = {}
+        self.__things = [] # a list of things in the world
+
+    def __str__(self):
+        return '<world: ' + self.name + '>'
+    
+    def add_place(self, p):
+        if self.has_place (p.name):
+            raise StandardError("Attempt to add place with duplicate name.")
+        self.__places[p.name] = p
+
+    def has_place(self, name):
+        #return self.__places.has_key(name)
+        return name in self.__places
+
+    def get_place(self, name):
+        if self.has_place(name):
+            return self.__places[name]
+        else:
+            return None
+
+    def install_thing(self, t, p):
+        assert self.has_place(p)    
+        self.__things.append(t)
+        t.install(self.get_place(p))
+
+    def connect_one_way(self, pn1, d, pn2):
+        assert self.has_place(pn1)
+        assert self.has_place(pn2)
+
+        place1 = self.get_place(pn1)
+        place2 = self.get_place(pn2)
+        
+        place1.add_neighbor(d, place2)
+        
+    def connect_both_ways(self, pn1, d, pn2):
+        # connects two places in direction d
+        self.connect_one_way(pn1, d, pn2)
+        self.connect_one_way(pn2, direction_opposite(d), pn1)
+
+    def tick(self):
+        # next time step for all objects that tick        
+        for t in self.__things:
+            if has_method(t, "tick"):
+                t.tick()                
+        
+    def play_interactively(self, character):        
+        while True: # loop forever, getting new commands
+            commands = input("what next? ")
+            if not commands:
+                print ("Huh?")
+            else:
+                try:
+                    advance = False # time only advances after certain actions    
+                    cmdlist = commands.split() # separate commands
+                    action = cmdlist[0]
+                    if action == "quit":
+                        print ("Better luck next time.  Play again soon!")
+                        break;                           
+                    elif action == "look":
+                        character.look()
+                        advance = True
+                    elif action == "go":
+                        if len(cmdlist) != 2:
+                            print ("A go command must be followed by a direction.")
+                            continue
+                        else:
+                            character.go(cmdlist[1])
+                            advance = True
+                    elif action == "take":
+                        if len(cmdlist) != 2:
+                            print ("A take command must be followed by the name of the item you want to take.")
+                            continue
+                        else:
+                            character.take(cmdlist[1])
+                            advance = True
+                    elif action == "eat":
+                        if len(cmdlist) != 2:
+                            print ("An eat command must be followed by a second attribute.")
+                        elif cmdlist[1] == "start":
+                            character.start_eating()
+                            advance = True
+                        elif cmdlist[1] == "stop":
+                            character.stop_eating()
+                            advance = True
+                        else:
+                            print ("Sorry, I don't know how to eat " + cmdlist[1])
+                    else: 
+                        print ("Sorry, I don't know how to " + str(action))
+                except AttributeError:
+                    print ("Error: undefined method: " + str(cmdlist))
+
+                if advance:
+                    self.tick()
+                    
+class Teacher (Person):
+    def lecture(self, stuff):
+        self.say (stuff + " - you should be taking notes")
+
+class MasterTeacher(Teacher):
+    def masterlecture(self,stuff):
+        self.say("It is intuitivly obvious that " + stuff + " - you should be taking notes")
+
+class Dean(MasterTeacher):
+    def say(self,stuff):
+        MasterTeacher.say(self,stuff + ' - Please recite the RPOH.')
+
+class Student(Person):
+    def __init__(self,name):
+        Person.__init__(self,name)
+        self.iseating = False
+        self.isplaying = False
+    def start_eating(self):
+        if self.iseating == False:
+            self.iseating = True
+            self.say("Woo, yummy yummy!")
+        else:
+            print(f"{self.name} is already eating")
+    def stop_eating(self):
+        if self.iseating == False:
+            print(f"{self.name} haven't started eating yet")
+        else:
+            self.iseating = False
+            self.say("I feel so full now")
+    def is_eating(self):
+        if not self.iseating:
+            return False
+        else:
+            return True
+    def play(self):
+        if self.isplaying == False:
+            self.isplaying = True
+            self.say("let's find cats to play with!")
+        else:
+            print(f"{self.name} is already prepared to play with the cats!")
+    def stop_play(self):
+        if self.isplaying == False:
+            print(f"{self.name} is not prepared to play yet.")
+        else:
+            self.isplaying = False
+            self.say("I do not want to play with cats anymore")
+    def is_play(self):
+        if not self.isplaying:
+            return False
+        else:
+            return True
+        
+class Prefect (Person):
+    def __init__(self, name, jail):   ### keep this!
+        Person.__init__(self, name)
+        self.set_restlessness(0.5)
+        self.__jail = jail
+    def book(self, student):
+        if student.location == self.location:
+            self.say(f"{student.name}, you are booked!")
+            self.say("You have the right to remain silent, call methods, and mutate instance variables.")
+            student.move(self.__jail)
+        else:
+            self.say(f"{student.name} is not here")
+    def tick(self):
+        for j in self.location.get_things():
+            if isinstance(j, Student):
+                if j.is_eating():
+                    self.book(j)
+            else:
+                self.say("No one to book.")
+
+class Cat(Person):
+    def __init__(self,name,home):
+        Person.__init__(self,name)
+        self.set_restlessness(0.5)
+        self.__home = home
+
+    def say(self, meow):
+        if self.is_installed ():
+            print ("At " + self.location.name + ":")
+        print (self.name + " meows -- " + meow)
+
+    def pur(self, pur):
+        if self.is_installed():
+            print ("At " + self.location.name + ":")
+        print (self.name + " purs happily -- " + pur)
+
+    def move(self, loc):
+        if not self.is_installed():
+            self.note("Cannot move until cat is installed.")
+            return
+
+        assert isinstance(loc, Place)
+        print (self.name + " moves from " + self.location.name + " to " + loc.name)
+        self.change_location(loc)
+        greetees = list(filter(lambda t: t.is_greetable(), loc.get_things()))
+        greetees.remove(self) # don't greet yourself!
+        if greetees:
+            map(lambda greetee: self.say("Meow"), greetees)
+        else:
+            self.say("mew")
+
+    def tick(self):
+        if self.location != self.__home:
+            for j in self.location.get_things():
+                if isinstance(j, Student):
+                    if j.is_play() == True:
+                        print(f"{self.name} is playing with {j.name}")
+                        self.pur("purrrrrrrr")
+                    else:
+                        self.say("MEOWWWWWWWW")
+                        print(f"{self.name} saw {j.name} and ran away! Where did it go!")
+                        self.move(self.__home)
+        elif self.location == self.__home:
+            self.pur("purrr")
+        
